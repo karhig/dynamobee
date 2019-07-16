@@ -145,9 +145,15 @@ public void someChange6(DynamoDBTemplate dynamoDBTemplate, AmazonDynamoDB amazon
 }
 
 @ChangeSet(order = "007", id = "someChangeWithDynamoDBTemplateAndAmazonDynamoDB", author = "testAuthor")
-public void someChange6(AmazonDynamoDB amazonDynamoDB, DynamoDBTemplate dynamoDBTemplate) {
+public void someChange7(AmazonDynamoDB amazonDynamoDB, DynamoDBTemplate dynamoDBTemplate) {
   // type: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
   // type: org.socialsignin.spring.data.dynamodb.core.DynamoDBTemplate
+}
+
+@ChangeSet(order = "008", id = "someChangeWithAmazonDynamoDBAndEnvironment", author = "testAuthor")
+public void someChange8(AmazonDynamoDB amazonDynamoDB, Environment environment) {
+  // type: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
+  // type: org.springframework.core.env.Environment
 }
 
 ```
