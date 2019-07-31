@@ -2,6 +2,7 @@ package com.github.dynamobee.utils;
 
 import static java.util.Arrays.asList;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -11,6 +12,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.reflections.Reflections;
 import org.springframework.context.annotation.Profile;
@@ -92,10 +95,16 @@ public class ChangeService {
 		if (!ClassUtils.isPresent("org.springframework.context.annotation.Profile", null)) {
 			return true;
 		}
-		if (!element.isAnnotationPresent(Profile.class)) {
-			return true; // no-profiled changeset always matches
-		}
-		List<String> profiles = asList(element.getAnnotation(Profile.class).value());
+
+		List<String> profiles = profileAnnotations(element).stream().
+        map(Profile::value).
+        flatMap(Stream::of).
+        collect(Collectors.toList());
+		
+		if (profiles.isEmpty()) {
+		  return true; // no-profiled changeset always matches
+    }
+
 		for (String profile : profiles) {
 			if (profile != null && profile.length() > 0 && profile.charAt(0) == '!') {
 				if (!activeProfiles.contains(profile.substring(1))) {
@@ -134,4 +143,26 @@ public class ChangeService {
 		return changesetMethods;
 	}
 
+	private List <Profile> profileAnnotations(AnnotatedElement element) {
+	  return Stream.of(element.getAnnotations()).
+        map(this::getProfile).
+        filter((p) -> p != null).
+        collect(Collectors.toList());
+  }
+
+  private Profile getProfile(Annotation annotation) {
+	  if (isProfileAnnotation(annotation)) {
+      return (Profile) (annotation);
+    } else {
+	    return Stream.of(annotation.annotationType().getAnnotations()).
+          filter(this::isProfileAnnotation). //  Does only allow one level of meta-annotation
+          map(this::getProfile).
+          filter(p -> p != null).
+          findFirst().
+          orElse(null);
+    }
+  }
+  private boolean isProfileAnnotation(Annotation annotation) {
+	  return annotation.annotationType().equals(Profile.class);
+  }
 }
