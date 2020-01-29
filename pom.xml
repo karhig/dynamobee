@@ -58,7 +58,7 @@
 		<dependency>
 			<groupId>com.amazonaws</groupId>
 			<artifactId>aws-java-sdk-dynamodb</artifactId>
-			<version>1.11.400</version>
+			<version>1.11.495</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
@@ -78,7 +78,7 @@
 		<dependency>
 			<groupId>com.github.derjust</groupId>
 			<artifactId>spring-data-dynamodb</artifactId>
-			<version>5.0.3</version>
+			<version>5.1.0</version>
 		</dependency>
 
 		<dependency>
@@ -167,7 +167,7 @@
 				<executions>
 					<execution>
 						<id>sign-artifacts</id>
-						<phase>verify</phase>
+						<phase>deploy</phase>
 						<goals>
 							<goal>sign</goal>
 						</goals>
