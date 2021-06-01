@@ -238,6 +238,13 @@ public class Dynamobee implements InitializingBean {
 			return changeSetMethod.invoke(changeLogInstance, amazonDynamoDB,
 					dynamoDBTemplate != null ? dynamoDBTemplate : new DynamoDBTemplate(amazonDynamoDB, this.dynamoDBMapper, this.dynamoDBMapperConfig));
 
+		} else if (changeSetMethod.getParameterTypes().length == 2
+				&& changeSetMethod.getParameterTypes()[0].equals(AmazonDynamoDB.class)
+				&& changeSetMethod.getParameterTypes()[1].equals(Environment.class)) {
+			logger.debug("method with AmazonDynamoDB and Environment arguments");
+
+			return changeSetMethod.invoke(changeLogInstance, amazonDynamoDB, springEnvironment);
+
 		} else if (changeSetMethod.getParameterTypes().length == 0) {
 			logger.debug("method with no params");
 
