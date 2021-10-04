@@ -1,78 +1,116 @@
 package com.github.dynamobee.changeset;
 
+import com.github.dynamobee.Dynamobee;
+import com.github.dynamobee.utils.DynamoDbEnhancedTableSchemaUtils;
 import java.util.Date;
-
-import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
+import software.amazon.awssdk.enhanced.dynamodb.DefaultAttributeConverterProvider;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbImmutable;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 
 
 /**
- * Entry in the changes collection log {@link com.github.dynamobee.Dynamobee#DEFAULT_CHANGELOG_TABLE_NAME}
+ * Entry in the changes collection log {@link Dynamobee#DEFAULT_CHANGELOG_TABLE_NAME}
  * Type: entity class.
  */
+@DynamoDbImmutable(
+    builder = ChangeEntry.Builder.class,
+    converterProviders = {
+    DynamoDbEnhancedTableSchemaUtils.DynamoBeeConverterProvider.class,
+    DefaultAttributeConverterProvider.class})
 public class ChangeEntry {
-	public static final String KEY_CHANGEID = "changeId";
-	public static final String KEY_AUTHOR = "author";
-	public static final String KEY_TIMESTAMP = "timestamp";
-	public static final String KEY_CHANGELOGCLASS = "changeLogClass";
-	public static final String KEY_CHANGESETMETHOD = "changeSetMethod";
+  private final String changeId;
+  private final String author;
+  private final Date timestamp;
+  private final String changeLogClass;
+  private final String changeSetMethodName;
 
-	private String changeId;
-	private String author;
-	private Date timestamp;
-	private String changeLogClass;
-	private String changeSetMethodName;
+  private ChangeEntry(Builder b) {
+    this.changeId = b.changeId;
+    this.author = b.author;
+    this.timestamp = b.timestamp;
+    this.changeLogClass = b.changeLogClass;
+    this.changeSetMethodName = b.changeSetMethodName;
+  }
 
-	public ChangeEntry(String changeId, String author, Date timestamp, String changeLogClass, String changeSetMethodName) {
-		this.changeId = changeId;
-		this.author = author;
-		this.timestamp = new Date(timestamp.getTime());
-		this.changeLogClass = changeLogClass;
-		this.changeSetMethodName = changeSetMethodName;
-	}
+  public static Builder builder() {
+    return new Builder();
+  }
 
-	public Item buildFullDBObject() {
-		return new Item()
-				.withPrimaryKey(KEY_CHANGEID, this.changeId)
-				.with(KEY_AUTHOR, this.author)
-				.with(KEY_TIMESTAMP, this.timestamp.getTime())
-				.with(KEY_CHANGELOGCLASS, this.changeLogClass)
-				.with(KEY_CHANGESETMETHOD, this.changeSetMethodName);
-	}
+  @Override
+  public String toString() {
+    return "[ChangeSet: id=" + this.changeId +
+        ", author=" + this.author +
+        ", timestamp=" + this.timestamp +
+        ", changeLogClass=" + this.changeLogClass +
+        ", changeSetMethod=" + this.changeSetMethodName + "]";
+  }
 
-	public QuerySpec buildSearchQuerySpec() {
-//		return new Document()
-//				.append(KEY_CHANGEID, this.changeId)
-//				.append(KEY_AUTHOR, this.author);
-		return new QuerySpec().withKeyConditionExpression(KEY_CHANGEID + " = " + this.changeId);
-	}
+  @DynamoDbPartitionKey
+  @DynamoDbAttribute("changeId")
+  public String getChangeId() {
+    return this.changeId;
+  }
 
-	@Override
-	public String toString() {
-		return "[ChangeSet: id=" + this.changeId +
-				", author=" + this.author +
-				", changeLogClass=" + this.changeLogClass +
-				", changeSetMethod=" + this.changeSetMethodName + "]";
-	}
+  @DynamoDbAttribute("author")
+  public String getAuthor() {
+    return this.author;
+  }
 
-	public String getChangeId() {
-		return this.changeId;
-	}
+  @DynamoDbAttribute("timestamp")
+  public Date getTimestamp() {
+    return this.timestamp;
+  }
 
-	public String getAuthor() {
-		return this.author;
-	}
+  @DynamoDbAttribute("changeLogClass")
+  public String getChangeLogClass() {
+    return this.changeLogClass;
+  }
 
-	public Date getTimestamp() {
-		return this.timestamp;
-	}
+  @DynamoDbAttribute("changeSetMethod")
+  public String getChangeSetMethodName() {
+    return this.changeSetMethodName;
+  }
 
-	public String getChangeLogClass() {
-		return this.changeLogClass;
-	}
+  public static final class Builder {
+    private String changeId;
+    private String author;
+    private Date timestamp;
+    private String changeLogClass;
+    private String changeSetMethodName;
 
-	public String getChangeSetMethodName() {
-		return this.changeSetMethodName;
-	}
+    private Builder() {
+      // Only created via ChangeEntry.builder()
+    }
+
+    public Builder setChangeId(String changeId) {
+      this.changeId = changeId;
+      return this;
+    }
+
+    public Builder setAuthor(String author) {
+      this.author = author;
+      return this;
+    }
+
+    public Builder setTimestamp(Date timestamp) {
+      this.timestamp = timestamp;
+      return this;
+    }
+
+    public Builder setChangeLogClass(String changeLogClass) {
+      this.changeLogClass = changeLogClass;
+      return this;
+    }
+
+    public Builder setChangeSetMethodName(String changeSetMethodName) {
+      this.changeSetMethodName = changeSetMethodName;
+      return this;
+    }
+
+    public ChangeEntry build() {
+      return new ChangeEntry(this);
+    }
+  }
 
 }

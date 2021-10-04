@@ -1,190 +1,195 @@
 package com.github.dynamobee.dao;
 
+import com.github.dynamobee.changeset.ChangeEntry;
+import com.github.dynamobee.exception.DynamobeeLockException;
+import com.github.dynamobee.utils.DynamoDbEnhancedTableSchemaUtils;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.Date;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.amazonaws.services.dynamodbv2.document.DynamoDB;
-import com.amazonaws.services.dynamodbv2.document.Expected;
-import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.Table;
-import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
-import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
-import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
-import com.amazonaws.services.dynamodbv2.model.KeyType;
-import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
-import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
-import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
-import com.github.dynamobee.changeset.ChangeEntry;
-import com.github.dynamobee.exception.DynamobeeConfigurationException;
-import com.github.dynamobee.exception.DynamobeeConnectionException;
-import com.github.dynamobee.exception.DynamobeeLockException;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.dynamodb.model.TableStatus;
 
 
 public class DynamobeeDao {
-	private static final Logger logger = LoggerFactory.getLogger("Dynamobee dao");
+  private static final Logger logger = LoggerFactory.getLogger("Dynamobee dao");
 
-	private static final String VALUE_LOCK = "LOCK";
+  static final TableSchema<ChangeEntry> CHANGE_ENTRY_TABLE_SCHEMA = TableSchema.fromImmutableClass(ChangeEntry.class);
 
-	private DynamoDB dynamoDB;
-	private String dynamobeeTableName;
-	private Table dynamobeeTable;
-	private boolean waitForLock;
-	private long changeLogLockWaitTime;
-	private long changeLogLockPollRate;
-	private boolean throwExceptionIfCannotObtainLock;
+  private static final String VALUE_LOCK = "LOCK";
+  private static final ChangeEntry LOCK_ITEM = ChangeEntry.builder()
+      .setChangeId(VALUE_LOCK)
+      .build();
 
-	public DynamobeeDao(String dynamobeeTableName, boolean waitForLock, long changeLogLockWaitTime,
-			long changeLogLockPollRate, boolean throwExceptionIfCannotObtainLock) {
-		this.dynamobeeTableName = dynamobeeTableName;
-		this.waitForLock = waitForLock;
-		this.changeLogLockWaitTime = changeLogLockWaitTime;
-		this.changeLogLockPollRate = changeLogLockPollRate;
-		this.throwExceptionIfCannotObtainLock = throwExceptionIfCannotObtainLock;
-	}
+  private DynamoDbClient dynamoDbClient;
+  private DynamoDbEnhancedClient dynamoDbEnhancedClient;
+  private String dynamobeeTableName;
+  private DynamoDbTable<ChangeEntry> dynamobeeTable;
+  private boolean waitForLock;
+  private long changeLogLockWaitTime;
+  private long changeLogLockPollRate;
+  private boolean throwExceptionIfCannotObtainLock;
 
-	public void connectDynamoDB(DynamoDB dynamoDB) throws DynamobeeConfigurationException {
-		this.dynamoDB = dynamoDB;
-		this.dynamobeeTable = findOrCreateDynamoBeeTable();
-	}
+  public DynamobeeDao(String dynamobeeTableName, boolean waitForLock, long changeLogLockWaitTime,
+                      long changeLogLockPollRate, boolean throwExceptionIfCannotObtainLock) {
+    this.dynamobeeTableName = dynamobeeTableName;
+    this.waitForLock = waitForLock;
+    this.changeLogLockWaitTime = changeLogLockWaitTime;
+    this.changeLogLockPollRate = changeLogLockPollRate;
+    this.throwExceptionIfCannotObtainLock = throwExceptionIfCannotObtainLock;
+  }
 
-	private Table findOrCreateDynamoBeeTable() {
-		logger.info("Searching for an existing DynamoBee table; please wait...");
-		try {
-			Table table = dynamoDB.getTable(dynamobeeTableName);
-			table.describe();
-			logger.info("DynamoBee table found");
-			return table;
+  public void connectDynamoDB(DynamoDbClient dynamoDbClient) {
+    this.dynamoDbClient = dynamoDbClient;
+    this.dynamoDbEnhancedClient = DynamoDbEnhancedClient.builder()
+        .dynamoDbClient(dynamoDbClient)
+        .build();
 
-		} catch (ResourceNotFoundException e) {
-			logger.info("Attempting to create DynamoBee table; please wait...");
-			Table table = dynamoDB.createTable(dynamobeeTableName,
-					Arrays.asList(new KeySchemaElement(ChangeEntry.KEY_CHANGEID, KeyType.HASH)),
-					Arrays.asList(new AttributeDefinition(ChangeEntry.KEY_CHANGEID, ScalarAttributeType.S)),
-					new ProvisionedThroughput(1L, 1L));
-			try {
-				table.waitForActive();
-			} catch (InterruptedException ex) {
-				//ok
-			}
-			System.out.println("Success. DynamoBee Table status: " + table.getDescription().getTableStatus());
-			return table;
-		}
-	}
+    dynamobeeTable = findOrCreateDynamoBeeTable();
+  }
 
-	/**
-	 * Try to acquire process lock
-	 *
-	 * @return true if successfully acquired, false otherwise
-	 * @throws DynamobeeConnectionException exception
-	 * @throws DynamobeeLockException exception
-	 */
-	public boolean acquireProcessLock() throws DynamobeeConnectionException, DynamobeeLockException {
-		boolean acquired = this.acquireLock();
+  private DynamoDbTable<ChangeEntry> findOrCreateDynamoBeeTable() {
+    logger.info("Searching for an existing DynamoBee table; please wait...");
 
-		if (!acquired && waitForLock) {
-			long timeToGiveUp = new Date().getTime() + (changeLogLockWaitTime * 1000 * 60);
-			while (!acquired && new Date().getTime() < timeToGiveUp) {
-				acquired = this.acquireLock();
-				if (!acquired) {
-					logger.info("Waiting for changelog lock....");
-					try {
-						Thread.sleep(changeLogLockPollRate * 1000);
-					} catch (InterruptedException e) {
-						// nothing
-					}
-				}
-			}
-		}
+    try {
+      dynamoDbClient.describeTable(describeTableRequest -> describeTableRequest
+              .tableName(dynamobeeTableName))
+          .table();
+      logger.info("DynamoBee table found");
+      return dynamoDbEnhancedClient.table(dynamobeeTableName, CHANGE_ENTRY_TABLE_SCHEMA);
+    } catch (ResourceNotFoundException rnfe) {
+      logger.info("Attempting to create DynamoBee table; please wait...");
+      var table = dynamoDbEnhancedClient.table(dynamobeeTableName, CHANGE_ENTRY_TABLE_SCHEMA);
+      table.createTable();
+      var waiterResult = dynamoDbClient.waiter()
+          .waitUntilTableExists(builder -> builder.tableName(dynamobeeTableName))
+          .matched();
 
-		if (!acquired && throwExceptionIfCannotObtainLock) {
-			logger.info("Dynamobee did not acquire process lock. Throwing exception.");
-			throw new DynamobeeLockException("Could not acquire process lock");
-		}
+      waiterResult.exception().ifPresent(throwable ->
+          logger.error("Failure. DynamoBee Table status: {}", TableStatus.CREATING, throwable));
 
-		return acquired;
-	}
+      waiterResult.response().ifPresent(response ->
+          logger.info("Success. DynamoBee Table status: {}", response.table().tableStatus()));
+      return table;
+    }
+  }
 
-	public boolean acquireLock() {
+  /**
+   * Try to acquire process lock
+   *
+   * @return true if successfully acquired, false otherwise
+   * @throws DynamobeeLockException exception
+   */
+  public boolean acquireProcessLock() throws DynamobeeLockException {
+    boolean acquired = this.acquireLock();
 
-		// acquire lock by attempting to insert the same value in the collection - if it already exists (i.e. lock held)
-		// there will be an exception
-		try {
-			Item item = new Item()
-					.withPrimaryKey(ChangeEntry.KEY_CHANGEID, VALUE_LOCK)
-					.withLong(ChangeEntry.KEY_TIMESTAMP, new Date().getTime())
-					.withString(ChangeEntry.KEY_AUTHOR, getHostName());
+    if (!acquired && waitForLock) {
+      long timeToGiveUp = new Date().getTime() + (changeLogLockWaitTime * 1000 * 60);
+      while (!acquired && new Date().getTime() < timeToGiveUp) {
+        acquired = this.acquireLock();
+        if (!acquired) {
+          logger.info("Waiting for changelog lock....");
+          try {
+            Thread.sleep(changeLogLockPollRate * 1000);
+          } catch (InterruptedException e) {
+            // nothing
+          }
+        }
+      }
+    }
 
-			this.dynamobeeTable.putItem(item, new Expected(ChangeEntry.KEY_CHANGEID).notExist());
-		} catch (ConditionalCheckFailedException ex) {
-			logger.warn("The lock has been already acquired.");
-			return false;
-		}
-		return true;
-	}
+    if (!acquired && throwExceptionIfCannotObtainLock) {
+      logger.info("Dynamobee did not acquire process lock. Throwing exception.");
+      throw new DynamobeeLockException("Could not acquire process lock");
+    }
 
-	private String getHostName() {
-		try {
-			return InetAddress.getLocalHost().getHostName();
-		} catch (UnknownHostException e) {
-			return "UnknownHost";
-		}
-	}
+    return acquired;
+  }
 
-	public void releaseProcessLock() throws DynamobeeConnectionException {
-		this.dynamobeeTable.deleteItem(ChangeEntry.KEY_CHANGEID, VALUE_LOCK);
-	}
+  public boolean acquireLock() {
 
-	public boolean isProccessLockHeld() throws DynamobeeConnectionException {
-		return this.dynamobeeTable.getItem(ChangeEntry.KEY_CHANGEID, VALUE_LOCK) != null;
-	}
+    // acquire lock by attempting to insert the same value in the collection - if it already exists (i.e. lock held)
+    // there will be an exception
+    try {
+      this.dynamobeeTable.putItem(requestConsumer -> requestConsumer
+          .item(ChangeEntry
+              .builder()
+              .setChangeId(VALUE_LOCK)
+              .setTimestamp(new Date())
+              .setAuthor(getHostName())
+              .build())
+          .conditionExpression(DynamoDbEnhancedTableSchemaUtils.notExists(CHANGE_ENTRY_TABLE_SCHEMA)));
+    } catch (ConditionalCheckFailedException ex) {
+      logger.warn("The lock has been already acquired.");
+      return false;
+    }
+    return true;
+  }
 
-	public boolean isNewChange(ChangeEntry changeEntry) throws DynamobeeConnectionException {
-		return this.dynamobeeTable.getItem(ChangeEntry.KEY_CHANGEID, changeEntry.getChangeId()) == null;
-	}
+  private String getHostName() {
+    try {
+      return InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      return "UnknownHost";
+    }
+  }
 
-	public void save(ChangeEntry changeEntry) throws DynamobeeConnectionException {
-		this.dynamobeeTable.putItem(changeEntry.buildFullDBObject());
-	}
+  public void releaseProcessLock() {
+    this.dynamobeeTable.deleteItem(LOCK_ITEM);
+  }
 
-	public void setChangelogTableName(String changelogCollectionName) {
-		this.dynamobeeTableName = changelogCollectionName;
-	}
+  public boolean isProccessLockHeld() {
+    return this.dynamobeeTable.getItem(LOCK_ITEM) != null;
+  }
 
-	public boolean isWaitForLock() {
-		return waitForLock;
-	}
+  public boolean isNewChange(ChangeEntry changeEntry) {
+    return this.dynamobeeTable.getItem(changeEntry) == null;
+  }
 
-	public void setWaitForLock(boolean waitForLock) {
-		this.waitForLock = waitForLock;
-	}
+  public void save(ChangeEntry changeEntry) {
+    this.dynamobeeTable.putItem(changeEntry);
+  }
 
-	public long getChangeLogLockWaitTime() {
-		return changeLogLockWaitTime;
-	}
+  public void setChangelogTableName(String changelogCollectionName) {
+    this.dynamobeeTableName = changelogCollectionName;
+  }
 
-	public void setChangeLogLockWaitTime(long changeLogLockWaitTime) {
-		this.changeLogLockWaitTime = changeLogLockWaitTime;
-	}
+  public boolean isWaitForLock() {
+    return waitForLock;
+  }
 
-	public long getChangeLogLockPollRate() {
-		return changeLogLockPollRate;
-	}
+  public void setWaitForLock(boolean waitForLock) {
+    this.waitForLock = waitForLock;
+  }
 
-	public void setChangeLogLockPollRate(long changeLogLockPollRate) {
-		this.changeLogLockPollRate = changeLogLockPollRate;
-	}
+  public long getChangeLogLockWaitTime() {
+    return changeLogLockWaitTime;
+  }
 
-	public boolean isThrowExceptionIfCannotObtainLock() {
-		return throwExceptionIfCannotObtainLock;
-	}
+  public void setChangeLogLockWaitTime(long changeLogLockWaitTime) {
+    this.changeLogLockWaitTime = changeLogLockWaitTime;
+  }
 
-	public void setThrowExceptionIfCannotObtainLock(boolean throwExceptionIfCannotObtainLock) {
-		this.throwExceptionIfCannotObtainLock = throwExceptionIfCannotObtainLock;
-	}
+  public long getChangeLogLockPollRate() {
+    return changeLogLockPollRate;
+  }
+
+  public void setChangeLogLockPollRate(long changeLogLockPollRate) {
+    this.changeLogLockPollRate = changeLogLockPollRate;
+  }
+
+  public boolean isThrowExceptionIfCannotObtainLock() {
+    return throwExceptionIfCannotObtainLock;
+  }
+
+  public void setThrowExceptionIfCannotObtainLock(boolean throwExceptionIfCannotObtainLock) {
+    this.throwExceptionIfCannotObtainLock = throwExceptionIfCannotObtainLock;
+  }
 
 }

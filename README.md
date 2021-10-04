@@ -36,7 +36,7 @@ In this case the migration process will be executed automatically on startup.
 ```java
 @Bean
 public Dynamobee dynamobee(){
-  Dynamobee runner = new Dynamobee(db); //DynamoDB Client: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
+  Dynamobee runner = new Dynamobee(db); //DynamoDB Client: see software.amazon.awssdk.services.dynamodb.DynamoDbClient
   runner.setChangeLogsScanPackage(
        "com.example.yourapp.changelogs"); // the package to be scanned for changesets
   
@@ -49,7 +49,7 @@ public Dynamobee dynamobee(){
 Using dynamobee without a spring context has similar configuration but you have to remember to run `execute()` method to start a migration process.
 
 ```java
-Dynamobee runner = new Dynamobee(db); //DynamoDB Client: see com.amazonaws.services.dynamodbv2.AmazonDynamoDB
+Dynamobee runner = new Dynamobee(db); //DynamoDB Client: see software.amazon.awssdk.services.dynamodb.DynamoDbClient
 runner.setChangeLogsScanPackage(
      "com.example.yourapp.changelogs"); // package to scan for changesets
 
@@ -75,7 +75,7 @@ package com.example.yourapp.changelogs;
 public class DatabaseChangelog {
   
   @ChangeSet(order = "001", id = "someChangeId", author = "testAuthor")
-  public void importantWorkToDo(DB db){
+  public void importantWorkToDo(DynamoDbClient db){
      // task implementation
   }
 
@@ -117,43 +117,9 @@ public void someChange1() {
    // method without arguments can do some non-db changes
 }
 
-@ChangeSet(order = "002", id = "someChangeWithDynamoDB", author = "testAuthor")
-public void someChange2(DynamoDB dynamoDB) {
-  // type: com.amazonaws.services.dynamodbv2.document.DynamoDB
-}
-
-@ChangeSet(order = "003", id = "someChangeWithAmazonDynamoDB", author = "testAuthor")
-public void someChange3(AmazonDynamoDB amazonDynamoDB) {
-  // type: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
-}
-
-@ChangeSet(order = "004", id = "someChangeWithDynamoDBTemplate", author = "testAuthor")
-public void someChange4(DynamoDBTemplate dynamoDBTemplate) {
-  // type: org.socialsignin.spring.data.dynamodb.core.DynamoDBTemplate
-}
-
-@ChangeSet(order = "005", id = "someChangeWithDynamoDBTemplateAndEnvironment", author = "testAuthor")
-public void someChange5(DynamoDBTemplate dynamoDBTemplate, Environment environment) {
-  // type: org.socialsignin.spring.data.dynamodb.core.DynamoDBTemplate
-  // type: org.springframework.core.env.Environment
-}
-
-@ChangeSet(order = "006", id = "someChangeWithDynamoDBTemplateAndAmazonDynamoDB", author = "testAuthor")
-public void someChange6(DynamoDBTemplate dynamoDBTemplate, AmazonDynamoDB amazonDynamoDB) {
-  // type: org.socialsignin.spring.data.dynamodb.core.DynamoDBTemplate
-  // type: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
-}
-
-@ChangeSet(order = "007", id = "someChangeWithDynamoDBTemplateAndAmazonDynamoDB", author = "testAuthor")
-public void someChange7(AmazonDynamoDB amazonDynamoDB, DynamoDBTemplate dynamoDBTemplate) {
-  // type: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
-  // type: org.socialsignin.spring.data.dynamodb.core.DynamoDBTemplate
-}
-
-@ChangeSet(order = "008", id = "someChangeWithAmazonDynamoDBAndEnvironment", author = "testAuthor")
-public void someChange8(AmazonDynamoDB amazonDynamoDB, Environment environment) {
-  // type: com.amazonaws.services.dynamodbv2.AmazonDynamoDB
-  // type: org.springframework.core.env.Environment
+@ChangeSet(order = "002", id = "someChangeWithDynamoDBClient", author = "testAuthor")
+public void someChange2(DynamoDbClient dynamoDB) {
+  // type: software.amazon.awssdk.services.dynamodb.DynamoDbClient
 }
 
 ```
@@ -167,7 +133,7 @@ _Example 1_: annotated change set will be invoked for a `dev` profile
 ```java
 @Profile("dev")
 @ChangeSet(author = "testuser", id = "myDevChangest", order = "01")
-public void devEnvOnly(DB db){
+public void devEnvOnly(DynamoDbClient db){
   // ...
 }
 ```
@@ -177,7 +143,7 @@ _Example 2_: all change sets in a changelog will be invoked for a `test` profile
 @Profile("test")
 public class ChangelogForTestEnv{
   @ChangeSet(author = "testuser", id = "myTestChangest", order = "01")
-  public void testingEnvOnly(DB db){
+  public void testingEnvOnly(DynamoDbClient db){
     // ...
   } 
 }

@@ -1,10 +1,9 @@
 package com.github.dynamobee.utils;
 
+import com.github.dynamobee.changeset.ChangeSet;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.Comparator;
-
-import com.github.dynamobee.changeset.ChangeSet;
 
 
 /**

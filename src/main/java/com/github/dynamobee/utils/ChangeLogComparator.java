@@ -2,10 +2,9 @@ package com.github.dynamobee.utils;
 
 import static org.springframework.util.StringUtils.hasText;
 
+import com.github.dynamobee.changeset.ChangeLog;
 import java.io.Serializable;
 import java.util.Comparator;
-
-import com.github.dynamobee.changeset.ChangeLog;
 
 
 /**

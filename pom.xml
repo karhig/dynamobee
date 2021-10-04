@@ -9,7 +9,7 @@
 
 	<groupId>com.github.dynamobee</groupId>
 	<artifactId>dynamobee</artifactId>
-	<version>0.7-SNAPSHOT</version>
+	<version>2.0-SNAPSHOT</version>
 
 	<licenses>
 		<license>
@@ -35,6 +35,10 @@
 			<id>stefanjauker</id>
 			<name>stefanjauker</name>
 		</developer>
+    <developer>
+      <id>karhig</id>
+      <name>karhig</name>
+    </developer>
 	</developers>
 
 	<distributionManagement>
@@ -49,17 +53,37 @@
 	</distributionManagement>
 
 	<properties>
+    <java.version>16</java.version>
+    <maven.compiler.release>${java.version}</maven.compiler.release>
+
+    <awssdk.v2.version>2.17.51</awssdk.v2.version>
 		<spring.version>4.0.6.RELEASE</spring.version>
+
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 	</properties>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${awssdk.v2.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
 	<dependencies>
-		<dependency>
-			<groupId>com.amazonaws</groupId>
-			<artifactId>aws-java-sdk-dynamodb</artifactId>
-			<version>1.11.495</version>
-		</dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>dynamodb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>dynamodb-enhanced</artifactId>
+    </dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-beans</artifactId>
@@ -74,11 +98,6 @@
 			<groupId>org.reflections</groupId>
 			<artifactId>reflections</artifactId>
 			<version>0.9.9</version>
-		</dependency>
-		<dependency>
-			<groupId>com.github.derjust</groupId>
-			<artifactId>spring-data-dynamodb</artifactId>
-			<version>5.1.0</version>
 		</dependency>
 
 		<dependency>
@@ -109,8 +128,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>2.4</version>
 				<configuration>
-					<source>1.8</source>
-					<target>1.8</target>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
 				</configuration>
 			</plugin>
 			<plugin>
