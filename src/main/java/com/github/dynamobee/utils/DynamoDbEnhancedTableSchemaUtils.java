@@ -46,12 +46,12 @@ public class DynamoDbEnhancedTableSchemaUtils {
 
       @Override
       public AttributeValue transformFrom(Date input) {
-        return AttributeValue.builder().s(Long.toString(input.getTime())).build();
+        return AttributeValue.builder().n(Long.toString(input.getTime())).build();
       }
 
       @Override
       public Date transformTo(AttributeValue input) {
-        return new Date(Long.parseLong(input.s()));
+        return new Date(Long.parseLong(input.n()));
       }
 
       @Override
@@ -61,7 +61,7 @@ public class DynamoDbEnhancedTableSchemaUtils {
 
       @Override
       public AttributeValueType attributeValueType() {
-        return AttributeValueType.S;
+        return AttributeValueType.N;
       }
     }
   }
